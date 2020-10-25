@@ -6,10 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const (
-	welcomeMessage = "%s joined the room"
-	leaveMessage   = "%s left the room"
-)
+const welcomeMessage = "%s joined the room"
 
 // Room ...
 type Room struct {
