@@ -11,10 +11,14 @@ var app = new Vue({
     users: []
   },
   mounted: function() {
-    this.connectToWebsocket();
+
   },
   methods: {
 
+    connect() {
+      this.connectToWebsocket();
+    },
+    
     connectToWebsocket() {
       // Pass the name paramter when connecting.
       this.ws = new WebSocket(this.serverUrl + "?name=" + this.user.name);
