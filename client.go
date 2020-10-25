@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -87,7 +86,7 @@ func (client *Client) readPump() {
 		_, jsonMessage, err := client.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("unexpected close error %v", err)
+				log.Printf("unexpected close error %s", err)
 			}
 			break
 		}
@@ -193,7 +192,7 @@ func (client *Client) handleNewMessage(jsonMessage []byte) {
 func (client *Client) notifyRoomJoined(room *Room, sender *Client) {
 
 	message := &Message{
-		Action: JoinRoomAction,
+		Action: RoomJoinedAction,
 		Target: room,
 		Sender: sender,
 	}
@@ -291,6 +290,5 @@ func ServeWs(wsServer *WsServer, w http.ResponseWriter, r *http.Request) {
 	go client.writePump()
 	go client.readPump()
 
-	fmt.Println("New client joined the hub")
-	fmt.Println(client)
+	wsServer.register <- client
 }

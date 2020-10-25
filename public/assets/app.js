@@ -10,7 +10,7 @@ var app = new Vue({
     },
     users: []
   },
-  mounted: function() {
+  mounted: function () {
 
   },
   methods: {
@@ -18,16 +18,55 @@ var app = new Vue({
     connect() {
       this.connectToWebsocket();
     },
-    
+
     connectToWebsocket() {
-      // Pass the name paramter when connecting.
       this.ws = new WebSocket(this.serverUrl + "?name=" + this.user.name);
       this.ws.addEventListener('open', (event) => { this.onWebsocketOpen(event) });
       this.ws.addEventListener('message', (event) => { this.handleNewMessage(event) });
     },
 
     onWebsocketOpen() {
-      console.log("connected to WS!");        
+      console.log("connected to WS!");
+    },
+
+    handleNewMessage(event) {
+
+      let data = event.data;
+      data = data.split(/\r?\n/);
+
+      for (let i = 0; i < data.length; i++) {
+        let msg = JSON.parse(data[i]);
+
+        switch (msg.action) {
+          
+          case "send-message":
+            this.handleChatMessage(msg);
+            break;
+
+          case "user-join":
+            this.handleUserJoined(msg);
+            break;
+
+          case "user-left":
+            this.handleUserLeft(msg);
+            break;
+            
+          case "room-joined":
+            this.handleRoomJoined(msg);
+            break;
+
+          default:
+            break;
+        }
+
+      }
+    },
+
+    handleChatMessage(msg) {
+      const room = this.findRoom(msg.target.id);
+      if (typeof room !== "undefined") {
+        room.messages.push(msg);
+      }
     },
 
     handleUserJoined(msg) {
@@ -46,52 +85,10 @@ var app = new Vue({
       room = msg.target;
       room.name = room.private ? msg.sender.name : room.name;
       room["messages"] = [];
-      this.room.push(room);
+      this.rooms.push(room);
     },
 
-    handleNewMessage(event) {
-
-      let data = event.data;
-      data = data.split(/\r?\n/);
-
-      for (let i = 0; i < data.length; i++) {
-
-          let msg = JSON.parse(data[i]);
-          switch (msg.action) {
-
-            case "send-message":
-              this.handleChatMessage(msg);
-              break;
-
-            case "user-join":
-              this.handleUserJoined(msg);
-              break;
-
-            case "user-left":
-              this.handleUserLeft(msg);
-              break;
-            
-            case "room-joined":
-              this.handleRoomJoined(msg);
-              break;
-
-            default:
-              break;
-
-          }
-        } 
-    },
-
-    handlerChatMessage(msg) {
-      const room = this.findRoom(msg.target.id);
-      if (typeof room !== "undefined") {
-        room.messages.push(msg);
-      }
-    },
-    
     sendMessage(room) {
-
-      // send message to correct room
       if (room.newMessage !== "") {
         this.ws.send(JSON.stringify({
           action: 'send-message',
@@ -114,28 +111,23 @@ var app = new Vue({
     },
 
     joinRoom() {
-
-      this.ws.send(JSON.stringify({
-        action: 'join-room',
-        message: this.roomInput
-      }));
+      this.ws.send(JSON.stringify({ action: 'join-room', message: this.roomInput }));
       this.roomInput = "";
     },
 
-    joinPrivateRoom() {
-      this.ws.send(JSON.stringify({ action: "join-room-private", message: room.id }));
-    },
-
     leaveRoom(room) {
-      this.ws.send(JSON.stringify({ action: 'leave-room', message: room.name }));
+      this.ws.send(JSON.stringify({ action: 'leave-room', message: room.id }));
 
       for (let i = 0; i < this.rooms.length; i++) {
-        if (this.rooms[i].name === room.name) {
+        if (this.rooms[i].id === room.id) {
           this.rooms.splice(i, 1);
           break;
         }
       }
-    }
+    },
 
+    joinPrivateRoom(room) {
+      this.ws.send(JSON.stringify({ action: 'join-room-private', message: room.id }));
+    }
   }
 })

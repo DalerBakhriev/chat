@@ -6,7 +6,10 @@ import (
 	"github.com/google/uuid"
 )
 
-const welcomeMessage = "%s joined the room"
+const (
+	welcomeMessage = "%s joined the room"
+	leaveMessage   = "%s left the room"
+)
 
 // Room ...
 type Room struct {
@@ -63,6 +66,7 @@ func (room *Room) registerClientInRoom(client *Client) {
 }
 
 func (room *Room) unregisterClientInRoom(client *Client) {
+
 	if _, ok := room.clients[client]; ok {
 		delete(room.clients, client)
 	}
