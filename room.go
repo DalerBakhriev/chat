@@ -1,12 +1,17 @@
 package main
 
 import (
+	"chat/config"
+	"context"
 	"fmt"
+	"log"
 
 	"github.com/google/uuid"
 )
 
 const welcomeMessage = "%s joined the room"
+
+var ctx = context.Background()
 
 // Room ...
 type Room struct {
@@ -35,6 +40,9 @@ func NewRoom(name string, private bool) *Room {
 // RunRoom runs our room, accepting various requests
 func (room *Room) RunRoom() {
 
+	// subscribe to pub/sub messages inside a new goroutine
+	go room.subscribeToRoomMessages()
+
 	for {
 		select {
 
@@ -45,10 +53,8 @@ func (room *Room) RunRoom() {
 			room.unregisterClientInRoom(client)
 
 		case message := <-room.broadcast:
-			room.broadCastToClientsInRoom(message.encode())
-
+			room.publishRoomMessage(message.encode())
 		}
-
 	}
 }
 
@@ -83,7 +89,7 @@ func (room *Room) notifyClientJoined(client *Client) {
 		Message: fmt.Sprintf(welcomeMessage, client.GetName()),
 	}
 
-	room.broadCastToClientsInRoom(message.encode())
+	room.publishRoomMessage(message.encode())
 }
 
 // GetName returns room's name
@@ -94,4 +100,28 @@ func (room *Room) GetName() string {
 // GetID returns room id as string
 func (room *Room) GetID() string {
 	return room.ID.String()
+}
+
+// GetPrivate returns private property of room
+func (room *Room) GetPrivate() bool {
+	return room.Private
+}
+
+func (room *Room) publishRoomMessage(message []byte) {
+
+	err := config.Redis.Publish(ctx, room.GetName(), message).Err()
+
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func (room *Room) subscribeToRoomMessages() {
+
+	pubSub := config.Redis.Subscribe(ctx, room.GetName())
+	ch := pubSub.Channel()
+
+	for msg := range ch {
+		room.broadCastToClientsInRoom([]byte(msg.Payload))
+	}
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"chat/models"
 	"encoding/json"
 	"log"
 )
@@ -17,10 +18,30 @@ const (
 
 // Message ...
 type Message struct {
-	Action  string  `json:"action"`
-	Message string  `json:"message"`
-	Target  *Room   `json:"target"`
-	Sender  *Client `json:"sender"`
+	Action  string      `json:"action"`
+	Message string      `json:"message"`
+	Target  *Room       `json:"target"`
+	Sender  models.User `json:"sender"`
+}
+
+// UnmarshalJSON ...
+func (message *Message) UnmarshalJSON(data []byte) error {
+
+	type Alias Message
+	msg := &struct {
+		Sender Client `json:"sender"`
+		*Alias
+	}{
+		Alias: (*Alias)(message),
+	}
+
+	if err := json.Unmarshal(data, &msg); err != nil {
+		return err
+	}
+
+	message.Sender = &msg.Sender
+
+	return nil
 }
 
 func (message *Message) encode() []byte {

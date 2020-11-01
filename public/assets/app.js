@@ -2,7 +2,7 @@ var app = new Vue({
   el: '#app',
   data: {
     ws: null,
-    serverUrl: "ws://localhost:8080/ws",
+    serverUrl: "ws://" + location.host + "/ws",
     roomInput: null,
     rooms: [],
     user: {

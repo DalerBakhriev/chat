@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"time"
 
+	"chat/config"
+	"chat/models"
+
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
@@ -189,7 +192,7 @@ func (client *Client) handleNewMessage(jsonMessage []byte) {
 
 }
 
-func (client *Client) notifyRoomJoined(room *Room, sender *Client) {
+func (client *Client) notifyRoomJoined(room *Room, sender models.User) {
 
 	message := &Message{
 		Action: RoomJoinedAction,
@@ -202,7 +205,7 @@ func (client *Client) notifyRoomJoined(room *Room, sender *Client) {
 
 // Joining a room both for public and private roooms
 // When joining a private room a sender is passed as the opposing party
-func (client *Client) joinRoom(roomName string, sender *Client) {
+func (client *Client) joinRoom(roomName string, sender models.User) *Room {
 
 	room := client.wsServer.findRoomByName(roomName)
 	if room == nil {
@@ -211,7 +214,7 @@ func (client *Client) joinRoom(roomName string, sender *Client) {
 
 	// Don't allow to join private rooms through public room message
 	if sender == nil && room.Private {
-		return
+		return nil
 	}
 
 	if !client.IsInRoom(room) {
@@ -219,6 +222,8 @@ func (client *Client) joinRoom(roomName string, sender *Client) {
 		room.register <- client
 		client.notifyRoomJoined(room, sender)
 	}
+
+	return room
 }
 
 // IsInRoom returns true if client is already in room
@@ -236,7 +241,7 @@ func (client *Client) IsInRoom(room *Room) bool {
 // Then we will bothe join the client and the target.
 func (client *Client) handleJoinRoomPrivateMessage(message Message) {
 
-	target := client.wsServer.findClientByID(message.Message)
+	target := client.wsServer.findUserByID(message.Message)
 	if target == nil {
 		return
 	}
@@ -244,8 +249,27 @@ func (client *Client) handleJoinRoomPrivateMessage(message Message) {
 	// create unique room name combined to the two IDs
 	roomName := message.Message + client.ID.String()
 
-	client.joinRoom(roomName, target)
-	target.joinRoom(roomName, client)
+	joinedRoom := client.joinRoom(roomName, target)
+
+	// Instead of instantaneously joining the target client.
+	// Let the target client join with a invite request over pub/sub
+	if joinedRoom != nil {
+		client.inviteTargetUser(target, joinedRoom)
+	}
+}
+
+func (client *Client) inviteTargetUser(target models.User, room *Room) {
+
+	inviteMessage := &Message{
+		Action:  JoinRoomPrivateAction,
+		Message: target.GetID(),
+		Target:  room,
+		Sender:  client,
+	}
+
+	if err := config.Redis.Publish(ctx, PubSubGeneralChannel, inviteMessage.encode()).Err(); err != nil {
+		log.Println(err)
+	}
 }
 
 func (client *Client) handleJoinRoomMessage(message Message) {
